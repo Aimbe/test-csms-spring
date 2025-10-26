@@ -22,7 +22,10 @@ src/
 │   └── resources/
 │       ├── application.yml                    # 애플리케이션 설정
 │       └── schema.sql                         # Oracle DDL 스크립트
-└── pom.xml                                    # Maven 설정
+├── build.gradle                               # Gradle 빌드 설정
+├── settings.gradle                            # Gradle 설정
+├── gradlew                                    # Gradle Wrapper (Unix/Linux/Mac)
+└── gradlew.bat                                # Gradle Wrapper (Windows)
 ```
 
 ## 도메인 모델
@@ -90,8 +93,8 @@ CONNECTOR (커넥터)
 ## 환경 설정
 
 ### 필수 요구사항
-- Java 17 이상
-- Maven 3.6 이상
+- Java 25
+- Gradle 8.12 이상 (또는 포함된 Gradle Wrapper 사용)
 - Oracle Database (또는 H2 Database for 테스트)
 
 ### 데이터베이스 설정
@@ -111,25 +114,32 @@ spring:
 개발 프로파일로 실행하면 H2 인메모리 데이터베이스를 사용합니다:
 
 ```bash
-mvn spring-boot:run -Dspring-boot.run.profiles=dev
+./gradlew bootRun --args='--spring.profiles.active=dev'
 ```
 
 H2 콘솔 접속: http://localhost:8080/h2-console
 
 ## 실행 방법
 
+### 0. Gradle Wrapper 초기화 (최초 1회만)
+프로젝트를 처음 받았을 때, Gradle Wrapper를 초기화해야 합니다:
+
+```bash
+gradle wrapper --gradle-version=8.12
+```
+
 ### 1. 프로젝트 빌드
 ```bash
-mvn clean install
+./gradlew clean build
 ```
 
 ### 2. 애플리케이션 실행
 ```bash
 # 기본 실행 (Oracle)
-mvn spring-boot:run
+./gradlew bootRun
 
 # 개발 환경 실행 (H2)
-mvn spring-boot:run -Dspring-boot.run.profiles=dev
+./gradlew bootRun --args='--spring.profiles.active=dev'
 ```
 
 ### 3. Oracle 스키마 생성
