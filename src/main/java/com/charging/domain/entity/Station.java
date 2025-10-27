@@ -8,8 +8,11 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * 충전소 엔티티
- * OCPP 2.0 기반 충전소 정보를 관리합니다.
+ * 충전소 (Charging Station) 엔티티
+ * OCPP 2.0.1 기반 충전소 정보를 관리합니다.
+ *
+ * OCPP 2.0.1 3-tier 계층 구조의 최상위:
+ * ChargingStation > EVSE > Connector
  */
 @Entity
 @Table(name = "STATION")
@@ -71,27 +74,27 @@ public class Station extends BaseEntity {
     private Long billingPowerId;
 
     /**
-     * 충전소에 속한 충전기 목록
-     * 1:N 관계 - 하나의 충전소는 여러 충전기를 가질 수 있음
+     * 충전소에 속한 EVSE 목록
+     * 1:N 관계 - 하나의 충전소는 여러 EVSE를 가질 수 있음
      */
     @OneToMany(mappedBy = "station", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default
-    private List<ChargePoint> chargePoints = new ArrayList<>();
+    private List<Evse> evses = new ArrayList<>();
 
     /**
-     * 충전기 추가 헬퍼 메서드
+     * EVSE 추가 헬퍼 메서드
      * 양방향 관계를 편리하게 설정
      */
-    public void addChargePoint(ChargePoint chargePoint) {
-        chargePoints.add(chargePoint);
-        chargePoint.setStation(this);
+    public void addEvse(Evse evse) {
+        evses.add(evse);
+        evse.setStation(this);
     }
 
     /**
-     * 충전기 제거 헬퍼 메서드
+     * EVSE 제거 헬퍼 메서드
      */
-    public void removeChargePoint(ChargePoint chargePoint) {
-        chargePoints.remove(chargePoint);
-        chargePoint.setStation(null);
+    public void removeEvse(Evse evse) {
+        evses.remove(evse);
+        evse.setStation(null);
     }
 }
