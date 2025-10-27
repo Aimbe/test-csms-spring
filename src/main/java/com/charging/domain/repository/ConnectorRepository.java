@@ -1,6 +1,7 @@
 package com.charging.domain.repository;
 
 import com.charging.domain.entity.Connector;
+import com.charging.domain.enums.ConnectorStatusEnum;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -18,41 +19,45 @@ public interface ConnectorRepository extends JpaRepository<Connector, Long> {
 
     /**
      * 복합 유니크 키로 커넥터 조회
-     * @param chargePointId 충전기 ID
-     * @param stationId 충전소 ID
-     * @param connectorId 커넥터 ID
-     * @return Optional<Connector>
      */
-    Optional<Connector> findByChargePointIdAndStationIdAndConnectorId(
-        String chargePointId,
+    Optional<Connector> findByEvseIdAndStationIdAndConnectorId(
+        Integer evseId,
         String stationId,
         Integer connectorId
     );
 
     /**
-     * 충전기 ID와 충전소 ID로 모든 커넥터 조회
-     * @param chargePointId 충전기 ID
-     * @param stationId 충전소 ID
-     * @return List<Connector>
+     * EVSE ID와 충전소 ID로 모든 커넥터 조회
      */
-    List<Connector> findByChargePointIdAndStationId(String chargePointId, String stationId);
+    List<Connector> findByEvseIdAndStationId(Integer evseId, String stationId);
 
     /**
      * 충전소 ID로 모든 커넥터 조회
-     * @param stationId 충전소 ID
-     * @return List<Connector>
      */
     List<Connector> findByStationId(String stationId);
 
     /**
+     * 상태로 커넥터 조회
+     */
+    List<Connector> findByStatus(ConnectorStatusEnum status);
+
+    /**
+     * 충전소 ID와 상태로 커넥터 조회
+     */
+    List<Connector> findByStationIdAndStatus(String stationId, ConnectorStatusEnum status);
+
+    /**
      * 특정 전력량 이상의 커넥터 조회
-     * @param minPower 최소 전력량
-     * @param stationId 충전소 ID
-     * @return List<Connector>
      */
     @Query("SELECT c FROM Connector c WHERE c.maxPower >= :minPower AND c.stationId = :stationId")
     List<Connector> findByMinPowerGreaterThanEqualAndStationId(
         @Param("minPower") java.math.BigDecimal minPower,
         @Param("stationId") String stationId
     );
+
+    /**
+     * 사용 가능한 커넥터 조회
+     */
+    @Query("SELECT c FROM Connector c WHERE c.status = 'AVAILABLE' AND c.stationId = :stationId")
+    List<Connector> findAvailableConnectors(@Param("stationId") String stationId);
 }
