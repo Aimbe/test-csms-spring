@@ -1,5 +1,6 @@
 package com.charging.domain.entity;
 
+import com.charging.domain.enums.OperationalStatusEnum;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -8,16 +9,19 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * 충전기 엔티티
- * OCPP 2.0 기반 충전기 정보를 관리합니다.
+ * EVSE (Electric Vehicle Supply Equipment) 엔티티
+ * OCPP 2.0.1 기반 충전 장비 정보를 관리합니다.
+ *
+ * OCPP 2.0.1 3-tier 계층 구조:
+ * ChargingStation > EVSE > Connector
  */
 @Entity
 @Table(
-    name = "CHARGE_POINT",
+    name = "EVSE",
     uniqueConstraints = {
         @UniqueConstraint(
-            name = "idx_charge_point_unique",
-            columnNames = {"charge_point_id", "station_id"}
+            name = "uk_evse_station",
+            columnNames = {"evse_id", "station_id"}
         )
     }
 )
@@ -25,11 +29,10 @@ import java.util.List;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @AllArgsConstructor
 @Builder
-public class ChargePoint extends BaseEntity {
+public class Evse extends BaseEntity {
 
     /**
      * ID (Primary Key)
-     * Oracle IDENTITY 컬럼으로 자동 생성
      */
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -37,15 +40,14 @@ public class ChargePoint extends BaseEntity {
     private Long id;
 
     /**
-     * 충전기 ID
-     * station_id와 함께 복합 유니크 키 구성
+     * EVSE ID (OCPP 2.0.1 표준)
+     * 충전소 내에서 고유한 EVSE 식별자
      */
-    @Column(name = "charge_point_id", length = 50, nullable = false)
-    private String chargePointId;
+    @Column(name = "evse_id", nullable = false)
+    private Integer evseId;
 
     /**
      * 충전소 ID (FK 역할 - 문자열)
-     * @ManyToOne으로 연관관계 매핑
      */
     @Column(name = "station_id", length = 50, nullable = false, insertable = false, updatable = false)
     private String stationId;
@@ -57,20 +59,36 @@ public class ChargePoint extends BaseEntity {
     private BigDecimal maxPower;
 
     /**
+     * 운영 상태
+     */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "operational_status", nullable = false)
+    @Builder.Default
+    private OperationalStatusEnum operationalStatus = OperationalStatusEnum.OPERATIVE;
+
+    /**
      * 소속 충전소
-     * N:1 관계 - 여러 충전기가 하나의 충전소에 속함
+     * N:1 관계 - 여러 EVSE가 하나의 충전소에 속함
      */
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "station_id", referencedColumnName = "station_id", nullable = false)
     private Station station;
 
     /**
-     * 충전기에 속한 커넥터 목록
-     * 1:N 관계 - 하나의 충전기는 여러 커넥터를 가질 수 있음
+     * EVSE에 속한 커넥터 목록
+     * 1:N 관계 - 하나의 EVSE는 여러 커넥터를 가질 수 있음
      */
-    @OneToMany(mappedBy = "chargePoint", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OneToMany(mappedBy = "evse", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default
     private List<Connector> connectors = new ArrayList<>();
+
+    /**
+     * EVSE에서 발생한 트랜잭션 목록
+     * 1:N 관계 - 하나의 EVSE는 여러 트랜잭션을 가질 수 있음
+     */
+    @OneToMany(mappedBy = "evse", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default
+    private List<Transaction> transactions = new ArrayList<>();
 
     /**
      * 충전소 설정 헬퍼 메서드
@@ -86,7 +104,7 @@ public class ChargePoint extends BaseEntity {
      */
     public void addConnector(Connector connector) {
         connectors.add(connector);
-        connector.setChargePoint(this);
+        connector.setEvse(this);
     }
 
     /**
@@ -94,6 +112,14 @@ public class ChargePoint extends BaseEntity {
      */
     public void removeConnector(Connector connector) {
         connectors.remove(connector);
-        connector.setChargePoint(null);
+        connector.setEvse(null);
+    }
+
+    /**
+     * 트랜잭션 추가 헬퍼 메서드
+     */
+    public void addTransaction(Transaction transaction) {
+        transactions.add(transaction);
+        transaction.setEvse(this);
     }
 }

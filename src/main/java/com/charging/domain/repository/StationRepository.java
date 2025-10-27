@@ -30,10 +30,10 @@ public interface StationRepository extends JpaRepository<Station, Long> {
     boolean existsByStationId(String stationId);
 
     /**
-     * 충전소와 연관된 모든 충전기를 함께 조회 (N+1 문제 해결)
+     * 충전소와 연관된 모든 EVSE를 함께 조회 (N+1 문제 해결)
      * @param stationId 충전소 ID
      * @return Optional<Station>
      */
-    @Query("SELECT s FROM Station s LEFT JOIN FETCH s.chargePoints WHERE s.stationId = :stationId")
-    Optional<Station> findByStationIdWithChargePoints(@Param("stationId") String stationId);
+    @Query("SELECT s FROM Station s LEFT JOIN FETCH s.evses WHERE s.stationId = :stationId")
+    Optional<Station> findByStationIdWithEvses(@Param("stationId") String stationId);
 }
