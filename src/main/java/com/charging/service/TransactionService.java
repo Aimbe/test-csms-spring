@@ -8,9 +8,13 @@ import com.charging.domain.enums.ChargingStateEnum;
 import com.charging.domain.enums.TransactionEventEnum;
 import com.charging.domain.repository.EvseRepository;
 import com.charging.domain.repository.TransactionRepository;
+import com.charging.dto.event.ChargingStateChangedEvent;
+import com.charging.dto.event.TransactionStartedEvent;
+import com.charging.dto.event.TransactionStoppedEvent;
 import com.charging.dto.request.TransactionStartRequest;
 import com.charging.dto.response.TransactionResponse;
 import com.charging.exception.ResourceNotFoundException;
+import com.charging.kafka.producer.TransactionEventProducer;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -33,6 +37,7 @@ public class TransactionService {
     private final TransactionRepository transactionRepository;
     private final EvseRepository evseRepository;
     private final TransactionMapper transactionMapper;
+    private final TransactionEventProducer eventProducer;
 
     /**
      * 트랜잭션 시작
@@ -71,6 +76,9 @@ public class TransactionService {
         Transaction savedTransaction = transactionRepository.save(transaction);
         log.info("트랜잭션 시작 완료: transactionId={}", transactionId);
 
+        // Kafka 이벤트 발행
+        publishTransactionStartedEvent(savedTransaction);
+
         // DTO 변환 후 반환
         return transactionMapper.toResponse(savedTransaction);
     }
@@ -100,6 +108,9 @@ public class TransactionService {
         log.info("트랜잭션 종료 완료: transactionId={}, totalEnergy={} kWh",
                 transactionId, transaction.getTotalEnergy());
 
+        // Kafka 이벤트 발행
+        publishTransactionStoppedEvent(savedTransaction, finalStopReason);
+
         // DTO 변환 후 반환
         return transactionMapper.toResponse(savedTransaction);
     }
@@ -115,11 +126,17 @@ public class TransactionService {
         Transaction transaction = transactionRepository.findByTransactionId(transactionId)
                 .orElseThrow(() -> new ResourceNotFoundException("Transaction", "transactionId", transactionId));
 
+        // 이전 상태 저장
+        ChargingStateEnum previousState = transaction.getChargingState();
+
         // 상태 업데이트
         transaction.updateChargingState(newState);
 
         // 저장
         Transaction savedTransaction = transactionRepository.save(transaction);
+
+        // Kafka 이벤트 발행
+        publishChargingStateChangedEvent(savedTransaction, previousState, newState);
 
         // DTO 변환 후 반환
         return transactionMapper.toResponse(savedTransaction);
@@ -138,5 +155,76 @@ public class TransactionService {
      */
     private String generateTransactionId() {
         return TransactionConstants.TRANSACTION_ID_PREFIX + System.currentTimeMillis();
+    }
+
+    /**
+     * 트랜잭션 시작 이벤트 발행
+     *
+     * @param transaction 시작된 트랜잭션
+     */
+    private void publishTransactionStartedEvent(Transaction transaction) {
+        TransactionStartedEvent event = TransactionStartedEvent.builder()
+                .transactionId(transaction.getTransactionId())
+                .evseId(transaction.getEvseId())
+                .stationId(transaction.getStationId())
+                .connectorId(transaction.getConnectorId())
+                .idToken(transaction.getIdToken())
+                .chargingState(transaction.getChargingState())
+                .startTime(transaction.getStartTime())
+                .eventTime(LocalDateTime.now())
+                .eventDescription("충전 트랜잭션이 시작되었습니다.")
+                .build();
+
+        eventProducer.publishTransactionStarted(event);
+    }
+
+    /**
+     * 트랜잭션 종료 이벤트 발행
+     *
+     * @param transaction 종료된 트랜잭션
+     * @param stopReason  종료 사유
+     */
+    private void publishTransactionStoppedEvent(Transaction transaction, String stopReason) {
+        TransactionStoppedEvent event = TransactionStoppedEvent.builder()
+                .transactionId(transaction.getTransactionId())
+                .evseId(transaction.getEvseId())
+                .stationId(transaction.getStationId())
+                .connectorId(transaction.getConnectorId())
+                .chargingState(transaction.getChargingState())
+                .startTime(transaction.getStartTime())
+                .stopTime(transaction.getStopTime())
+                .totalEnergy(transaction.getTotalEnergy())
+                .stopReason(stopReason)
+                .eventTime(LocalDateTime.now())
+                .eventDescription("충전 트랜잭션이 종료되었습니다.")
+                .build();
+
+        eventProducer.publishTransactionStopped(event);
+    }
+
+    /**
+     * 충전 상태 변경 이벤트 발행
+     *
+     * @param transaction   트랜잭션
+     * @param previousState 이전 상태
+     * @param currentState  현재 상태
+     */
+    private void publishChargingStateChangedEvent(Transaction transaction,
+                                                    ChargingStateEnum previousState,
+                                                    ChargingStateEnum currentState) {
+        ChargingStateChangedEvent event = ChargingStateChangedEvent.builder()
+                .transactionId(transaction.getTransactionId())
+                .evseId(transaction.getEvseId())
+                .stationId(transaction.getStationId())
+                .connectorId(transaction.getConnectorId())
+                .previousState(previousState)
+                .currentState(currentState)
+                .stateChangedTime(LocalDateTime.now())
+                .eventTime(LocalDateTime.now())
+                .eventDescription(String.format("충전 상태가 %s에서 %s로 변경되었습니다.",
+                        previousState, currentState))
+                .build();
+
+        eventProducer.publishChargingStateChanged(event);
     }
 }
