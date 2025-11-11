@@ -19,6 +19,24 @@ spring:
       idle-timeout: 600000
       max-lifetime: 1800000
 
+  # Kafka 설정
+  kafka:
+    bootstrap-servers: localhost:9092
+    consumer:
+      group-id: charging-domain-group
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+      properties:
+        spring.json.trusted.packages: "*"
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+      acks: all
+      retries: 3
+    listener:
+      ack-mode: manual
+
   # JPA 설정
   jpa:
     # Hibernate 설정
@@ -66,6 +84,9 @@ logging:
     # Spring Framework 로그
     org.springframework.web: INFO
     org.springframework.data: INFO
+    # Kafka 로그
+    org.apache.kafka: INFO
+    org.springframework.kafka: DEBUG
 
 ---
 # 개발 환경 프로파일
